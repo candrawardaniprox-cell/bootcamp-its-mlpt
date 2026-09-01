@@ -1,0 +1,23 @@
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  name: my-container
+  labels:
+    app: my-container
+spec:
+  replicas: 5
+  selector:
+    matchLabels:
+      app: my-container
+  template:
+    metadata:
+      labels:
+        app: my-container
+    spec:
+      containers:
+        - name: my-container
+          image: docker.io/tobiasaditya/my-container:1.0.0
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8000
+              protocol: TCP
