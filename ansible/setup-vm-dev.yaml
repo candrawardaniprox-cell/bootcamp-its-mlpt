@@ -1,23 +1,6 @@
 ---
-# ensure_tools_and_login.yml
-#
-# Installs git, podman, python3 (via dnf) and oc (direct download),
-# validates all four, then:
-#   1. git clone <git_repo_url> into <git_dest>
-#   2. podman login <podman_registry_url>        (only if credentials given)
-#   3. oc login <oc_api_url> --token=<oc_token>   (only if a token given)
-#
-# Override defaults via -e, a Survey, or Job Template Extra Variables:
-#   -e git_repo_url=https://github.com/myorg/myrepo.git
-#   -e podman_registry_url=quay.io
-#   -e podman_registry_username=myuser
-#   -e podman_registry_password=mypassword
-#   -e oc_api_url=https://api.mycluster.example.com:6443
-#   -e oc_token='sha256~xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx'
-
 - name: Ensure required tooling is installed, validated and logged in
   hosts: all
-  become: true
 
   vars:
     git_repo_url: "https://github.com/ansible/ansible-examples.git"
@@ -38,6 +21,7 @@
       ansible.builtin.dnf:
         name: [git, podman, python3]
         state: present
+      become: true
 
     - name: Download oc CLI
       ansible.builtin.get_url:
@@ -51,6 +35,7 @@
         dest: "/usr/local/bin"
         remote_src: true
         mode: "0755"
+      become: true
 
     # --- Validate ---
     - name: Check versions of all tools
