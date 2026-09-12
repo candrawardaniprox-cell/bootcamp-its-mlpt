@@ -1,0 +1,97 @@
+---
+# ensure_tools_and_login.yml
+#
+# Installs git, podman, python3 (via dnf) and oc (direct download),
+# validates all four, then:
+#   1. git clone <git_repo_url> into <git_dest>
+#   2. podman login <podman_registry_url>        (only if credentials given)
+#   3. oc login <oc_api_url> --token=<oc_token>   (only if a token given)
+#
+# Override defaults via -e, a Survey, or Job Template Extra Variables:
+#   -e git_repo_url=https://github.com/myorg/myrepo.git
+#   -e podman_registry_url=quay.io
+#   -e podman_registry_username=myuser
+#   -e podman_registry_password=mypassword
+#   -e oc_api_url=https://api.mycluster.example.com:6443
+#   -e oc_token='sha256~xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx'
+
+- name: Ensure required tooling is installed, validated and logged in
+  hosts: all
+  become: true
+
+  vars:
+    git_repo_url: "https://github.com/ansible/ansible-examples.git"
+    git_dest: "/home/{{ ansible_user }}/repo"
+
+    podman_registry_url: "quay.io"
+    podman_registry_username: ""
+    podman_registry_password: ""
+
+    oc_api_url: "https://api.example.com:6443"
+    oc_token: ""
+    oc_cli_download_url: "https://mirror.openshift.com/pub/openshift-v4/x86_64/clients/ocp/stable/openshift-client-linux.tar.gz"
+
+  tasks:
+
+    # --- Install ---
+    - name: Install git, podman and python3
+      ansible.builtin.dnf:
+        name: [git, podman, python3]
+        state: present
+
+    - name: Download oc CLI
+      ansible.builtin.get_url:
+        url: "{{ oc_cli_download_url }}"
+        dest: "/tmp/openshift-client-linux.tar.gz"
+        mode: "0644"
+
+    - name: Extract oc to /usr/local/bin
+      ansible.builtin.unarchive:
+        src: "/tmp/openshift-client-linux.tar.gz"
+        dest: "/usr/local/bin"
+        remote_src: true
+        mode: "0755"
+
+    # --- Validate ---
+    - name: Check versions of all tools
+      ansible.builtin.command: "{{ item }}"
+      loop:
+        - git --version
+        - podman --version
+        - python3 --version
+        - oc version --client
+      register: tool_versions
+      changed_when: false
+
+    - name: Show installed versions
+      ansible.builtin.debug:
+        msg: "{{ tool_versions.results | map(attribute='stdout') | list }}"
+
+    # --- git clone ---
+    - name: Clone the git repository
+      ansible.builtin.git:
+        repo: "{{ git_repo_url }}"
+        dest: "{{ git_dest }}"
+
+    # --- podman login ---
+    - name: Log in to the container registry with podman
+      ansible.builtin.command: "podman login {{ podman_registry_url }} -u {{ podman_registry_username }} -p {{ podman_registry_password }}"
+      when: podman_registry_username | length > 0 and podman_registry_password | length > 0
+      no_log: true
+
+    # --- oc login ---
+    - name: Log in to the OpenShift cluster with oc
+      ansible.builtin.command: "oc login {{ oc_api_url }} --token={{ oc_token }}"
+      when: oc_token | length > 0
+      no_log: true
+
+    - name: Confirm oc login
+      ansible.builtin.command: oc whoami
+      register: oc_whoami
+      changed_when: false
+      when: oc_token | length > 0
+
+    - name: Show oc login identity
+      ansible.builtin.debug:
+        msg: "Logged in as {{ oc_whoami.stdout }}"
+      when: oc_token | length > 0
