@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
         - name: my-container
-          image: docker.io/tobiasaditya/my-container:1.0.0
+          image: default-route-openshift-image-registry.apps.rm3.7wse.p1.openshiftapps.com/tobias-aditya-dev/my-image:1.0.0
           imagePullPolicy: Always
           ports:
             - containerPort: 8000
