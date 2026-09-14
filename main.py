@@ -1,45 +1,73 @@
 from fastapi import FastAPI
-from typing import Optional, Annotated
 from pydantic import BaseModel, Field, ConfigDict
-from pymongo import AsyncMongoClient
-from pymongo import ReturnDocument
 from datetime import datetime
-from pydantic.functional_validators import BeforeValidator
+from beanie import Document, init_beanie
+from pymongo import AsyncMongoClient
 
 app = FastAPI()
 
-client = AsyncMongoClient("STRING")
-db = client["bootcamp"]
-trx_collection = db["trx_collection"]
+class Transaction(Document):
+    date: datetime
+    amount: int
+    method: str
+    desc: str
+    trx_type: str
 
-PyObjectId = Annotated[str, BeforeValidator(str)]
+    class Settings:
+        name = "trx_collection"
 
 class RequestNewTransaction(BaseModel):
     amount: int
     method: str
     desc: str
+    trx_type: str
 
-class Transaction(BaseModel):
-    id: Optional[PyObjectId] = Field(alias="_id", default=None)
-    date: datetime
-    amount: int
-    method: str
-    desc: str
-    model_config = ConfigDict(
-        populate_by_name=True,
-        arbitrary_types_allowed=True,
-        validate_assignment=True
-    )
-
-@app.get("/")
-async def root():
-    return {"message": "Hello World"}
+@app.on_event("startup")
+async def init_db():
+    client = AsyncMongoClient("string")
+    await init_beanie(database=client.bootcamp, document_models=[Transaction])
 
 @app.post("/transaction/add")
 async def add_transaction(request_body: RequestNewTransaction):
-    data = Transaction(date=datetime.now(), amount=request_body.amount, method=request_body.method, desc=request_body.desc)
-    result = await trx_collection.insert_one(data.model_dump(by_alias=True, exclude=["id"]))
-    
-    data.id = result.inserted_id
+    trx = Transaction(date=datetime.now(), amount=request_body.amount, method=request_body.method, desc=request_body.desc, trx_type=request_body.trx_type)
+    await trx.insert()
+    return trx
 
-    return data
+@app.get("/transaction")
+async def get_transaction(start_date: datetime, end_date: datetime):
+    return await Transaction.find(
+        Transaction.date >= start_date, Transaction.date <= end_date
+    ).to_list()
+
+@app.get("/transaction/summary")
+async def summary_by_method(year: int, month: int):
+    start = datetime(year, month, 1)
+    # first day of next month
+    if month == 12:
+        end = datetime(year + 1, 1, 1)
+    else:
+        end = datetime(year, month + 1, 1)
+
+    pipeline = [
+        {
+            "$match": {
+                "date": {
+                    "$gte": start, 
+                    "$lt": end
+                }
+            }
+        },
+        {
+            "$group": {
+                "_id": "$trx_type",
+                "total_amount": {
+                    "$sum": "$amount"
+                },
+                "count": {
+                    "$sum": 1
+                },
+            }
+        }
+    ]
+
+    return await Transaction.aggregate(pipeline).to_list()
