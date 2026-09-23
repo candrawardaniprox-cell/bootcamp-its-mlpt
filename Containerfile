@@ -1,21 +1,26 @@
-# Use the official Python image as the base image
-FROM python:3.11-slim
+# Gunakan base image resmi Red Hat UBI untuk Python 3.10
+FROM registry.access.redhat.com/ubi9/python-39:latest 
 
-# Set the working directory inside the container
+# Beralih ke root sementara untuk menghindari masalah permission di /app
+USER root
+
+# Set direktori kerja
 WORKDIR /app
 
-# Install Python dependencies
+# Salin file requirements.txt
 COPY requirements.txt /app/
 
-# Install dependencies
+# Install dependensi
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy the FastAPI application code into the container
+# Salin seluruh kode aplikasi
 COPY . /app/
 
-# Expose the port that the FastAPI application will run on
+# Kembalikan ke user non-root (default UBI adalah user 1001) demi keamanan OpenShift
+USER 1001
+
+# Buka port 8000
 EXPOSE 8000
 
-# Start the FastAPI application
+# Jalankan FastAPI
 CMD ["fastapi", "run"]
-
