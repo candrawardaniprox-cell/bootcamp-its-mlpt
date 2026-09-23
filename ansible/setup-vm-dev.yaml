@@ -15,7 +15,17 @@
     oc_cli_download_url: "https://mirror.openshift.com/pub/openshift-v4/x86_64/clients/ocp/stable/openshift-client-linux.tar.gz"
 
   tasks:
-
+    # --- PRE-VALIDATION ---
+    - name: Pra-validasi kelengkapan input dan kredensial
+      ansible.builtin.assert:
+        that:
+          - git_repo_url is defined and git_repo_url | trim | length > 0
+          - podman_registry_username is defined and podman_registry_username | trim | length > 0
+          - podman_registry_password is defined and podman_registry_password | trim | length > 0
+          - oc_token is defined and oc_token | trim | length > 0
+        fail_msg: "OTOMATISASI DIHENTIKAN: Ada input yang kosong. Harap isi username, password, token, atau URL dengan benar."
+        success_msg: "PRA-VALIDASI BERHASIL: Semua input valid. Memulai otomatisasi..."
+        
     # --- Install ---
     - name: Install git, podman and python3
       ansible.builtin.dnf:
