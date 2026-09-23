@@ -62,13 +62,13 @@
     - name: Log in to the container registry with podman
       ansible.builtin.command: "podman login {{ podman_registry_url }} -u {{ podman_registry_username }} -p {{ podman_registry_password }}"
       when: podman_registry_username | length > 0 and podman_registry_password | length > 0
-      #no_log: true
+      no_log: true
 
     # --- oc login ---
     - name: Log in to the OpenShift cluster with oc
       ansible.builtin.command: "oc login {{ oc_api_url }} --token={{ oc_token }}"
       when: oc_token | length > 0
-      #no_log: true
+      no_log: true
 
     - name: Confirm oc login
       ansible.builtin.command: oc whoami
