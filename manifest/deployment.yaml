@@ -8,11 +8,11 @@ spec:
   replicas: 5
   selector:
     matchLabels:
-      app: my-container
+      app: its-mlpt
   template:
     metadata:
       labels:
-        app: my-container
+        app: its-mlpt
     spec:
       containers:
         - name: my-container

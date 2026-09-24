@@ -1,0 +1,71 @@
+---
+- name: Setup VM Dev and Install MongoDB Local
+  hosts: all
+  become: true
+
+  vars:
+    mongodb_version: "8.0"
+    mongodb_port: 27017
+
+  tasks:
+    # 1. Paket dasar untuk development + container (Task 1 butuh podman)
+    - name: Install paket dasar
+      ansible.builtin.dnf:
+        name:
+          - git
+          - podman
+          - python3-pip
+          - curl
+        state: present
+
+    # 2. Repo resmi MongoDB.
+    #    Fedora tidak didukung resmi, jadi repo RHEL 9 dipakai secara eksplisit
+    #    (jangan pakai $releasever karena di Fedora nilainya 41/42/dst dan repo-nya tidak ada).
+    - name: Import GPG key MongoDB
+      ansible.builtin.rpm_key:
+        key: "https://pgp.mongodb.com/server-{{ mongodb_version }}.asc"
+        state: present
+
+    - name: Tambah repo MongoDB Community
+      ansible.builtin.yum_repository:
+        name: "mongodb-org-{{ mongodb_version }}"
+        description: "MongoDB Repository"
+        baseurl: "https://repo.mongodb.org/yum/redhat/9/mongodb-org/{{ mongodb_version }}/x86_64/"
+        gpgcheck: true
+        gpgkey: "https://pgp.mongodb.com/server-{{ mongodb_version }}.asc"
+        enabled: true
+
+    # 3. Install MongoDB (server + mongosh + tools)
+    - name: Install MongoDB Community
+      ansible.builtin.dnf:
+        name: mongodb-org
+        state: present
+
+    # 4. Jalankan service (default bind hanya 127.0.0.1, aman untuk dev lokal)
+    - name: Enable dan start mongod
+      ansible.builtin.systemd_service:
+        name: mongod
+        state: started
+        enabled: true
+
+    - name: Tunggu port MongoDB siap
+      ansible.builtin.wait_for:
+        host: 127.0.0.1
+        port: "{{ mongodb_port }}"
+        timeout: 60
+
+    # 5. Verifikasi
+    - name: Ping MongoDB
+      ansible.builtin.command:
+        argv:
+          - mongosh
+          - --quiet
+          - --eval
+          - "db.runCommand({ ping: 1 }).ok"
+      register: mongo_ping
+      changed_when: false
+      failed_when: mongo_ping.stdout.strip() != "1"
+
+    - name: Tampilkan hasil
+      ansible.builtin.debug:
+        msg: "MongoDB aktif di mongodb://localhost:{{ mongodb_port }} (ping OK)"

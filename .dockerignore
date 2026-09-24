@@ -1,2 +1,6 @@
-venv/
-Containerfile
+venv
+.venv
+__pycache__
+.git
+*.xlsx
+*.csv
